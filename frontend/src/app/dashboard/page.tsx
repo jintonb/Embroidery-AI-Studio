@@ -10,6 +10,7 @@ interface Project {
   name: string;
   status: string;
   created_at: string;
+  embroidery_file_url?: string;
 }
 
 export default function DashboardPage() {
