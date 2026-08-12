@@ -48,19 +48,17 @@ async def upload_image(
         project.original_image_url = original_path
 
         # Run AI Pipeline (Background removal + OpenCV processing)
-        processed_bytes = process_image_pipeline(contents)
+        processed_bytes, palette = process_image_pipeline(contents)
         
         # Save processed image
         processed_path = os.path.join(UPLOAD_DIR, f"processed_{uuid.uuid4()}.png")
         with open(processed_path, "wb") as f:
             f.write(processed_bytes)
 
-        # Assuming this endpoint sets the stage for vectorization/embroidery engine
-        # In a real app, you might trigger a background Celery task here.
-        # We will store the processed image URL in the DB for now.
-        # To avoid adding a new column to Project just for the processed image,
-        # we'll update the embroidery_file_url for now (will be replaced by actual embroidery file later)
+        # Update project with image url and extracted colors
         project.embroidery_file_url = processed_path
+        project.original_palette = palette
+        project.mapped_palette = palette
         
         # We leave status as processing or set to completed depending on if digitization happens here
         # For Phase 4, let's keep it processing, ready for Phase 5.

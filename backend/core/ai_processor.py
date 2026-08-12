@@ -44,6 +44,14 @@ def preprocess_for_vectorization(image_bytes: bytes) -> bytes:
     ret, label, center = cv2.kmeans(Z, K, None, criteria, 10, cv2.KMEANS_RANDOM_CENTERS)
     
     center = np.uint8(center)
+    
+    # Extract the color palette as HEX strings
+    palette = []
+    for b, g, r in center:
+        hex_color = f"#{r:02x}{g:02x}{b:02x}"
+        if hex_color not in palette:
+            palette.append(hex_color)
+
     res = center[label.flatten()]
     quantized = res.reshape((denoised.shape))
 
@@ -59,10 +67,10 @@ def preprocess_for_vectorization(image_bytes: bytes) -> bytes:
     if not success:
         raise ValueError("Could not encode processed image")
         
-    return encoded_img.tobytes()
+    return encoded_img.tobytes(), palette
 
-def process_image_pipeline(image_bytes: bytes) -> bytes:
+def process_image_pipeline(image_bytes: bytes):
     """Runs the full AI preprocessing pipeline."""
     no_bg = remove_background(image_bytes)
-    processed = preprocess_for_vectorization(no_bg)
-    return processed
+    processed_bytes, palette = preprocess_for_vectorization(no_bg)
+    return processed_bytes, palette

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -19,6 +19,13 @@ class Project(Base):
     original_image_url = Column(String, nullable=True)
     embroidery_file_url = Column(String, nullable=True)
     status = Column(Enum(ProjectStatus), default=ProjectStatus.PENDING)
+    
+    # Store colors as JSON arrays/objects
+    original_palette = Column(JSON, nullable=True)
+    mapped_palette = Column(JSON, nullable=True)
+    stitch_data = Column(JSON, nullable=True)
+    preview_png_url = Column(String, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

@@ -21,6 +21,10 @@ class ProjectResponse(BaseModel):
     status: ProjectStatus
     original_image_url: str | None = None
     embroidery_file_url: str | None = None
+    original_palette: List[str] | None = None
+    mapped_palette: List[str] | None = None
+    stitch_data: list | None = None
+    preview_png_url: str | None = None
     created_at: datetime
     updated_at: datetime | None = None
 
@@ -89,9 +93,13 @@ def delete_project(
 
 from core.digitizer import image_to_stitches
 
+class DigitizeRequest(BaseModel):
+    color_map: dict[str, str] = {}
+
 @router.post("/{project_id}/digitize", response_model=ProjectResponse)
 def digitize_project(
     project_id: int, 
+    request: DigitizeRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -106,11 +114,20 @@ def digitize_project(
     processed_image_path = project.embroidery_file_url
     
     try:
+        # Save the new color mapping to the project mapped_palette if it exists
+        if project.original_palette:
+            new_mapped_palette = []
+            for og_color in project.original_palette:
+                new_mapped_palette.append(request.color_map.get(og_color, og_color))
+            project.mapped_palette = new_mapped_palette
+
         # Run the digitization engine
-        pes_path = image_to_stitches(processed_image_path)
+        zip_path, png_path, stitch_data = image_to_stitches(processed_image_path, color_map=request.color_map)
         
         # Update the project with the final embroidery file and status
-        project.embroidery_file_url = pes_path
+        project.embroidery_file_url = zip_path
+        project.preview_png_url = png_path
+        project.stitch_data = stitch_data
         project.status = ProjectStatus.COMPLETED
         db.commit()
         db.refresh(project)
@@ -119,4 +136,28 @@ def digitize_project(
     except Exception as e:
         project.status = ProjectStatus.FAILED
         db.commit()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{project_id}/remap")
+def remap_preview(project_id: int, request: DigitizeRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from core.digitizer import generate_preview_png
+    project = db.query(Project).filter(Project.id == project_id, Project.user_id == current_user.id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not project.embroidery_file_url:
+        raise HTTPException(status_code=400, detail="No image to remap")
+    
+    # Use original image path
+    # If zip file exists, we need the processed image. Store it.
+    img_path = project.original_image_url or project.embroidery_file_url
+    # Prefer embroidery_file_url when status is processing (it points to processed PNG)
+    if project.status.value == 'processing':
+        img_path = project.embroidery_file_url
+    
+    try:
+        png_path = generate_preview_png(img_path, color_map=request.color_map)
+        project.preview_png_url = png_path
+        db.commit()
+        return {"preview_png_url": png_path}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

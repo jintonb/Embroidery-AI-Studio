@@ -30,12 +30,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from routers import auth, projects, billing, upload
+from routers import auth, projects, billing, upload, threads
 
 app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(billing.router)
 app.include_router(upload.router)
+app.include_router(threads.router)
+
+from fastapi.staticfiles import StaticFiles
+import os
+
+# Create exports directory if it doesn't exist
+os.makedirs("exports", exist_ok=True)
+app.mount("/exports", StaticFiles(directory="exports"), name="exports")
+
+os.makedirs('uploads', exist_ok=True)
+app.mount('/uploads', StaticFiles(directory='uploads'), name='uploads')
 
 @app.get("/")
 async def root():
